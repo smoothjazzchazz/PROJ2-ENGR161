@@ -209,7 +209,7 @@ def find_cheapest_configuration(M_in, target_purity=98.0):
 
 # Function to calculate energy losses in pipes, bends, and vertical lift
 def calculate_energy_loss(mass_flow_rate, pipe_length_ft, pipe_diameter_m, pipe_friction_factor, 
-                          bend_loss_coefficient, vertical_lift_ft):
+                          bend_loss_coefficient, vertical_lift_ft, valve_loss_coefficient, num_valves):
     # Convert pipe length and vertical lift to meters
     pipe_length_m = pipe_length_ft * FT_TO_M
     vertical_lift_m = vertical_lift_ft * FT_TO_M
@@ -222,20 +222,25 @@ def calculate_energy_loss(mass_flow_rate, pipe_length_ft, pipe_diameter_m, pipe_
 
     # Step 1: Head loss due to pipe friction (Darcy-Weisbach)
     head_loss_pipe = (pipe_friction_factor * pipe_length_m / pipe_diameter_m) * (velocity ** 2 / (2 * GRAVITY))
-    energy_loss_pipe = mass_flow_rate * GRAVITY * head_loss_pipe
+    energy_loss_pipe = mass_flow_rate * GRAVITY * head_loss_pipe  # in Joules/s
 
     # Step 2: Head loss due to bends
     head_loss_bend = bend_loss_coefficient * (velocity ** 2 / (2 * GRAVITY))
-    energy_loss_bend = mass_flow_rate * GRAVITY * (2 * head_loss_bend)  # for two bends
+    energy_loss_bend = mass_flow_rate * GRAVITY * (2 * head_loss_bend)  # for two bends, in Joules/s
 
-    # Step 3: Energy required for vertical lift
-    energy_loss_vertical = mass_flow_rate * GRAVITY * vertical_lift_m
+    # Step 3: Head loss due to valves
+    head_loss_valve = valve_loss_coefficient * (velocity ** 2 / (2 * GRAVITY))
+    energy_loss_valve = mass_flow_rate * GRAVITY * (num_valves * head_loss_valve)  # for multiple valves, in Joules/s
 
-    # Total energy loss
-    total_energy_loss = energy_loss_pipe + energy_loss_bend + energy_loss_vertical
-    total_energy_loss_MJ_per_day = total_energy_loss * 86400
+    # Step 4: Energy required for vertical lift
+    energy_loss_vertical = mass_flow_rate * GRAVITY * vertical_lift_m  # in Joules/s
+
+    # Total energy loss (in Joules/s), converted to MJ/day
+    total_energy_loss_J_per_s = energy_loss_pipe + energy_loss_bend + energy_loss_valve + energy_loss_vertical
+    total_energy_loss_MJ_per_day = total_energy_loss_J_per_s * 86400 # 86400 seconds in a day, converted to MJ
     return {
         "Energy Loss in Pipe (MJ/day)": round(energy_loss_pipe * 86400, 2),
+        "Energy Loss in Valves (MJ/day)": round(energy_loss_valve * 86400, 2),
         "Energy Loss in Bends (MJ/day)": round(energy_loss_bend * 86400, 2),
         "Energy for Vertical Lift (MJ/day)": round(energy_loss_vertical * 86400, 2),
         "Total Energy Loss (MJ/day)": round(total_energy_loss_MJ_per_day, 2)
@@ -250,6 +255,8 @@ def calculate_energy_roi(
     pump_tier,
     pipe_diameter_m,
     pipe_quality,
+    valve_loss_coefficient,
+    num_valves,
     pipe_length_ft=90,  # fixed pipe length in feet
     bend_diameter=0.12,  # example bend diameter
     bend_angle=90,  # angle of bends
@@ -276,14 +283,14 @@ def calculate_energy_roi(
     pipe_friction_factor = equipment_data["pipe"]["diameter_costs"][pipe_diameter_m][pipe_quality]["friction_factor"]
     bend_loss_coefficient = equipment_data["bend"]["cost"][bend_diameter][bend_angle]  # simplified as coefficient
     energy_losses = calculate_energy_loss(mass_flow_rate, pipe_length_ft, pipe_diameter_m, 
-                                          pipe_friction_factor, bend_loss_coefficient, vertical_lift_ft)
+                                          pipe_friction_factor, bend_loss_coefficient, vertical_lift_ft, valve_loss_coefficient, num_valves)
     total_energy_loss = energy_losses["Total Energy Loss (MJ/day)"]
 
     # Total energy consumed including losses
-    total_energy_consumed = energy_consumed_MJ + total_energy_loss
+    total_energy_consumed = energy_consumed_MJ
 
     # Calculate EROI
-    EROI = energy_produced / total_energy_consumed if total_energy_consumed > 0 else 0
+    EROI = (energy_produced - total_energy_loss) / total_energy_consumed
 
     return {
         "EROI": round(EROI, 2),
@@ -297,42 +304,9 @@ def main():
     # Example Input Parameters
 
     M_in = 2000000 # kg/day, example initial mass of corn solution
-
-    # Select equipment tiers
-    fermenter_tier = "World-class"          # Options: "Scrap", "Average", "Premium", "World-class"
-    distillation_tier = "World-class"       # Options: "Scrap", "Average", "Premium", "World-class"
-    material_removal_tier = "World-class"  # Options: "Scrap", "Average", "Premium", "World-class"
-
-    # Calculate Ethanol Output
-    output = calculate_ethanol_output(
-        M_in,
-        fermenter_tier,
-        distillation_tier,
-        material_removal_tier,
-    )
-    # Display Results
-    print("=== Ethanol Production Output ===")
-    print(f"Initial Corn Solution Mass: {M_in} kg/day")
-    print(f"Fermenter Tier: {fermenter_tier} (Efficiency: {equipment_data['fermenter'][fermenter_tier]['efficiency']})")
-    print(f"Distillation Tier: {distillation_tier} (Efficiency: {equipment_data['distillation'][distillation_tier]['efficiency']})")
-    print(f"Material Removal Tier: {material_removal_tier} (Efficiency: {equipment_data['material_removal'][material_removal_tier]['efficiency']})")
-    print("-----------------------------------")
-    print(f"Ethanol Output Mass: {output['Ethanol Mass (kg/day)']} kg/day")
-    print(f"Ethanol Purity: {output['Ethanol Purity (%)']}%")
-    print(f"Ethanol Output Volume: {output['Ethanol Volume (gallons/day)']} gallons/day")
-    print(f"Ethanol mass left: {output['Ethanol mass left (kg)']} kg/day")
-    print(f"Total mass left: {output['Total mass left (kg)']} kg/day")
-    print("-----------------------------------")
-
     # Check Against Target
     target_volume = 100000  # gallons/day
-    target_purity = 98.0     # percent
-
-    meets_volume = output["Ethanol Volume (gallons/day)"] >= target_volume
-    meets_purity = output["Ethanol Purity (%)"] >= target_purity
-
-    print(f"Meets Target Volume (100,000 gallons/day): {'Yes' if meets_volume else 'No'}")
-    print(f"Meets Target Purity (98%): {'Yes' if meets_purity else 'No'}")
+    target_purity = 98.0     # percentage
 
     # Find the cheapest configuration to achieve the target purity
     best_config = find_cheapest_configuration(M_in)
@@ -366,10 +340,12 @@ def main():
     pump_tier = best_config['pump_tier']
     pipe_diameter_m = .12
     pipe_quality = best_config['pipe_tier']
+    valve_loss_coefficient = 800
+    num_valves = 8
 
     roi_output = calculate_energy_roi(
         M_in, fermenter_tier, distillation_tier, material_removal_tier, pump_tier,
-        pipe_diameter_m, pipe_quality
+        pipe_diameter_m, pipe_quality, valve_loss_coefficient, num_valves
     )
     print("=== Comprehensive EROI Calculation ===")
     print(f"Energy Produced: {roi_output['Energy Produced (MJ/day)']} MJ/day")
