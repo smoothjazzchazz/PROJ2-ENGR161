@@ -233,11 +233,12 @@ def calculate_energy_loss(mass_flow_rate, pipe_length_ft, pipe_diameter_m, pipe_
 
     # Total energy loss
     total_energy_loss = energy_loss_pipe + energy_loss_bend + energy_loss_vertical
+    total_energy_loss_MJ_per_day = total_energy_loss * 86400
     return {
-        "Energy Loss in Pipe (MJ/day)": round(energy_loss_pipe / 1e6, 2),
-        "Energy Loss in Bends (MJ/day)": round(energy_loss_bend / 1e6, 2),
-        "Energy for Vertical Lift (MJ/day)": round(energy_loss_vertical / 1e6, 2),
-        "Total Energy Loss (MJ/day)": round(total_energy_loss / 1e6, 2)
+        "Energy Loss in Pipe (MJ/day)": round(energy_loss_pipe * 86400, 2),
+        "Energy Loss in Bends (MJ/day)": round(energy_loss_bend * 86400, 2),
+        "Energy for Vertical Lift (MJ/day)": round(energy_loss_vertical * 86400, 2),
+        "Total Energy Loss (MJ/day)": round(total_energy_loss_MJ_per_day, 2)
     }
 
 # Function to calculate comprehensive EROI
