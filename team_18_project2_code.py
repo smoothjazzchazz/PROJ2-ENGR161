@@ -99,7 +99,6 @@ def calculate_ethanol_output(
     fermenter_tier,
     distillation_tier,
     material_removal_tier,
-    dehydration_efficiency=0.98  # Default to 98% as per "World-class"
 ):
     """
     Calculate the ethanol output by weight, purity, and volume.
@@ -201,7 +200,8 @@ def find_cheapest_configuration(M_in, target_purity=98.0):
     return best_config
 def main():
     # Example Input Parameters
-    M_in = 5000000 # kg/day, example initial mass of corn solution
+
+    M_in = 2000000 # kg/day, example initial mass of corn solution
 
     # Select equipment tiers
     fermenter_tier = "World-class"          # Options: "Scrap", "Average", "Premium", "World-class"
