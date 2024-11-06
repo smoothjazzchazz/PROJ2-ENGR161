@@ -221,15 +221,15 @@ def calculate_energy_loss(mass_flow_rate, pipe_length_ft, pipe_diameter_m, pipe_
     velocity = volume_flow_rate / area  # m/s
 
     # Step 1: Head loss due to pipe friction (Darcy-Weisbach)
-    head_loss_pipe = (pipe_friction_factor * pipe_length_m / pipe_diameter_m) * (velocity ** 2 / (2 * GRAVITY))
+    head_loss_pipe = (pipe_friction_factor * pipe_length_m * velocity ** 2)/ (pipe_diameter_m*2)
     energy_loss_pipe = mass_flow_rate * GRAVITY * head_loss_pipe  # in Joules/s
 
     # Step 2: Head loss due to bends
-    head_loss_bend = bend_loss_coefficient * (velocity ** 2 / (2 * GRAVITY))
+    head_loss_bend = ((bend_loss_coefficient * (velocity * velocity)) / (2))
     energy_loss_bend = mass_flow_rate * GRAVITY * (2 * head_loss_bend)  # for two bends, in Joules/s
 
     # Step 3: Head loss due to valves
-    head_loss_valve = valve_loss_coefficient * (velocity ** 2 / (2 * GRAVITY))
+    head_loss_valve = (valve_loss_coefficient * velocity * velocity) / 2
     energy_loss_valve = mass_flow_rate * GRAVITY * (num_valves * head_loss_valve)  # for multiple valves, in Joules/s
 
     # Step 4: Energy required for vertical lift
@@ -290,7 +290,7 @@ def calculate_energy_roi(
     total_energy_consumed = energy_consumed_MJ
 
     # Calculate EROI
-    EROI = (energy_produced - total_energy_loss) / total_energy_consumed
+    EROI = (energy_produced - energy_consumed_MJ) / (total_energy_consumed)
 
     return {
         "EROI": round(EROI, 2),
@@ -322,18 +322,22 @@ def main():
         print(f"Bend Angle: {best_config['bend_angle']} degrees")
         print(f"Valve Tier: {best_config['valve_tier']}")
         print(f"Pump Tier: {best_config['pump_tier']}")
-        print(f"Total Cost: ${best_config['cost']}")
+        print("Cost of building: 1,300,000")
+        print("Cost of road: 18,000")
+        print("Total Cost:", best_config['cost']+ 1300000 + 18000)
         print(f"Ethanol Output Mass: {best_config['output']['Ethanol Mass (kg/day)']} kg/day")
         print(f"Ethanol Purity: {best_config['output']['Ethanol Purity (%)']}%")
         print(f"Ethanol Output Volume: {best_config['output']['Ethanol Volume (gallons/day)']} gallons/day")
     else:
         print("No suitable configuration found to achieve the target purity.")
     print("-----------------------------------")
+    # Check if the output meets the target volume and purity
     meets_volume = best_config['output']['Ethanol Volume (gallons/day)'] >= target_volume
     meets_purity = best_config['output']['Ethanol Purity (%)'] >= target_purity
     print(f"Meets Target Volume (100,000 gallons/day): {'Yes' if meets_volume else 'No'}")
     print(f"Meets Target Purity (98%): {'Yes' if meets_purity else 'No'}")
     
+
     fermenter_tier = best_config['fermenter_tier']
     distillation_tier = best_config['distillation_tier']
     material_removal_tier = best_config['material_removal_tier']
@@ -347,6 +351,7 @@ def main():
         M_in, fermenter_tier, distillation_tier, material_removal_tier, pump_tier,
         pipe_diameter_m, pipe_quality, valve_loss_coefficient, num_valves
     )
+    
     print("=== Comprehensive EROI Calculation ===")
     print(f"Energy Produced: {roi_output['Energy Produced (MJ/day)']} MJ/day")
     print(f"Energy Consumed by Equipment: {roi_output['Energy Consumed by Equipment (MJ/day)']} MJ/day")
